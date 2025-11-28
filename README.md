@@ -1,4 +1,4 @@
-# Gestion de Projets et Tâches Académiques
+# Gestion de Projets Académiques
 
 Application web full-stack permettant aux professeurs de créer et gérer des projets pédagogiques, et aux étudiants de déposer leurs comptes-rendus et de suivre leurs tâches assignées.
 
