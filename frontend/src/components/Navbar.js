@@ -1,4 +1,4 @@
-// src/components/Navbar.js
+// src/components/Navbar.js → STYLE DASHBOARD (BLANC + GRADIENT + BOUTON MAGNIFIQUE)
 import { useState, useEffect } from 'react';
 import { Link, useHistory } from 'react-router-dom';
 
@@ -10,32 +10,50 @@ const Navbar = () => {
     const handleStorageChange = () => {
       setToken(localStorage.getItem('token'));
     };
-
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    setToken(null);  // ← Mise à jour immédiate de l'état
+    setToken(null);
     history.push('/');
   };
 
   return (
-    <nav className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg">
-      <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-        <Link to="/" className="text-2xl font-bold">ProjetTracker</Link>
-        <div className="space-x-6">
-          <Link to="/" className="hover:text-gray-200">Accueil</Link>
+    <nav className="bg-white shadow-lg border-b border-gray-100">
+      <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
+        {/* Logo avec gradient comme dans le Dashboard */}
+        <Link to="/" className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+          ProjetTracker
+        </Link>
+
+        <div className="flex items-center gap-8">
+          <Link to="/" className="text-gray-700 font-medium hover:text-indigo-600 transition">
+            Accueil
+          </Link>
+
           {!token ? (
             <>
-              <Link to="/login" className="hover:text-gray-200">Connexion</Link>
-              <Link to="/register" className="bg-white text-blue-600 px-5 py-2 rounded-lg hover:bg-gray-100">Inscription</Link>
+              <Link to="/login" className="text-gray-700 font-medium hover:text-indigo-600 transition">
+                Connexion
+              </Link>
+              <Link
+                to="/register"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition transform hover:scale-105"
+              >
+                Inscription
+              </Link>
             </>
           ) : (
             <>
-              <Link to="/dashboard" className="hover:text-gray-200">Tableau de bord</Link>
-              <button onClick={handleLogout} className="bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 px-5 py-2 rounded-lg">
+              <Link to="/dashboard" className="text-gray-700 font-medium hover:text-indigo-600 transition">
+                Tableau de bord
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-7 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition transform hover:scale-105"
+              >
                 Déconnexion
               </button>
             </>

@@ -1,4 +1,4 @@
-// src/components/ProjectList.js → VERSION 100% SANS ERREUR + MODAL PARFAIT
+// src/components/ProjectList.js → VERSION CORRIGÉE (sans erreur "project is null")
 import { useState } from 'react';
 import Modal from 'react-modal';
 import ProjectForm from './ProjectForm';
@@ -7,231 +7,332 @@ import API from '../services/api';
 Modal.setAppElement('#root');
 
 const ProjectList = ({ projects = [], user, refreshProjects }) => {
-  const [profModalOpen, setProfModalOpen] = useState(false);
-  const [currentProject, setCurrentProject] = useState(null);
-  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentModal, setStudentModal] = useState(false);
+  const [profModal, setProfModal] = useState(false);
+  const [editProject, setEditProject] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
 
   const isProf = user?.role === 'admin';
 
-  const openProfModal = (project = null) => {
-    setCurrentProject(project);
-    setProfModalOpen(true);
-  };
-
-  const closeProfModal = () => {
-    setProfModalOpen(false);
-    setCurrentProject(null);
+  // CORRECTION : Vérification que project n'est pas null/undefined
+  const mySubmission = (project) => {
+    if (!project || !project.submissions || !user?._id) return null;
+    return project.submissions.find(s => {
+      const studentId = s?.student?._id || s?.student;
+      return studentId?.toString() === user._id.toString();
+    });
   };
 
   const openStudentModal = (project) => {
-    if (!project) return;
+    if (!project) return; // CORRECTION : Vérification ajoutée
     setSelectedProject(project);
-    const submission = getMySubmission(project);
+    const submission = mySubmission(project);
     setFileName(submission?.customName || '');
-    setSelectedFile(null);
-    setStudentModalOpen(true);
+    setFile(null);
+    setStudentModal(true);
   };
 
-  const closeStudentModal = () => {
-    setStudentModalOpen(false);
-    setSelectedProject(null);
-    setFileName('');
-    setSelectedFile(null);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Supprimer ce projet ?')) return;
-    await API.delete(`/projects/${id}`);
-    refreshProjects();
-  };
-
-  const handleSubmitFile = async () => {
-    if (!selectedFile) return alert('Veuillez sélectionner un fichier');
-    if (!fileName.trim()) return alert('Veuillez donner un nom à votre rendu');
+  const submitStudentFile = async () => {
+    if (!file) return alert('Choisissez un fichier');
+    if (!fileName.trim()) return alert('Donnez un nom au fichier');
+    if (!selectedProject) return alert('Erreur: projet non sélectionné');
 
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    formData.append('file', file);
     formData.append('customName', fileName.trim());
 
     try {
       await API.post(`/projects/${selectedProject._id}/submit`, formData);
       alert('Rendu déposé avec succès !');
-      closeStudentModal();
+      setStudentModal(false);
+      setSelectedProject(null);
       refreshProjects();
     } catch (err) {
-      alert('Erreur lors du dépôt');
+      console.error('Erreur dépôt:', err.response?.data || err);
+      alert(err.response?.data?.msg || 'Erreur lors du dépôt');
     }
   };
 
-  const handleDeleteSubmission = async (projectId) => {
-    if (!window.confirm('Supprimer définitivement ton rendu ?')) return;
-    await API.delete(`/projects/${projectId}/submission`);
-    refreshProjects();
+  const openProfModal = (project = null) => {
+    setEditProject(project);
+    setProfModal(true);
   };
 
-  // PROTECTION CONTRE NULL / UNDEFINED
-  const hasSubmitted = (project) => {
-    if (!project || !project.submissions || !Array.isArray(project.submissions)) return false;
-    return project.submissions.some(sub => {
-      if (!sub || !sub.student) return false;
-      const studentId = sub.student._id || sub.student;
-      return studentId && studentId.toString() === user?._id;
-    });
+  const deleteProject = async (projectId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce projet ?')) {
+      try {
+        await API.delete(`/projects/${projectId}`);
+        refreshProjects();
+      } catch (err) {
+        console.error('Erreur suppression:', err);
+        alert('Erreur lors de la suppression');
+      }
+    }
   };
 
-  const getMySubmission = (project) => {
-    if (!project || !project.submissions || !Array.isArray(project.submissions)) return null;
-    return project.submissions.find(sub => {
-      if (!sub || !sub.student) return false;
-      const studentId = sub.student._id || sub.student;
-      return studentId && studentId.toString() === user?._id;
-    });
-  };
+  // CORRECTION : Vérification que projects est un tableau valide
+  if (!Array.isArray(projects)) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-600 text-lg">Aucun projet disponible</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 p-8">
+    <div className="space-y-12">
+      {/* Bouton Créer (prof) */}
       {isProf && (
-        <div className="text-center mb-12">
+        <div className="text-center">
           <button
             onClick={() => openProfModal()}
-            className="px-10 py-6 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold text-xl rounded-full shadow-2xl transition transform hover:scale-105"
+            className="px-12 py-5 bg-white text-indigo-600 font-bold text-xl rounded-full shadow-2xl hover:shadow-purple-500/50 transition transform hover:scale-105"
           >
-            + Ajouter un projet
+            + Créer un nouveau projet
           </button>
         </div>
       )}
 
-      <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
-        {projects.map((project) => (
-          <div
-            key={project._id}
-            className="bg-white rounded-3xl shadow-2xl p-10 border border-gray-100 hover:shadow-purple-400 transition-all duration-300"
-          >
-            <h3 className="text-3xl font-bold text-indigo-900 mb-4">{project.name || 'Sans titre'}</h3>
-            <p className="text-gray-600 text-lg mb-6">{project.description || 'Pas de description'}</p>
-            <p className="text-gray-700 font-semibold mb-8">
-              Deadline : <span className="text-indigo-600 font-bold text-xl">
-                {project.deadline ? new Date(project.deadline).toLocaleDateString('fr-FR') : 'Non définie'}
-              </span>
-            </p>
+      {/* Cartes */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+        {projects.map((project) => {
+          // CORRECTION : Vérification que project existe avant de l'utiliser
+          if (!project) return null;
+          
+          const submission = mySubmission(project);
+          const isDeadlinePassed = new Date(project.deadline) < new Date();
 
-            {project.pdf && (
-              <a
-                href={`http://localhost:5000/${project.pdf}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mb-8 px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition"
-              >
-                Télécharger le sujet
-              </a>
-            )}
+          return (
+            <div key={project._id} className="bg-white rounded-3xl shadow-2xl overflow-hidden transform hover:scale-105 transition duration-300">
+              <div className={`p-8 text-white ${isDeadlinePassed ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-indigo-500 to-purple-600'}`}>
+                <h3 className="text-2xl font-bold">{project.name}</h3>
+                <p className="text-lg mt-2 opacity-90">
+                  Deadline : {new Date(project.deadline).toLocaleDateString('fr-FR')}
+                </p>
+                {isDeadlinePassed && (
+                  <p className="text-sm mt-2 font-semibold">⚠️ Deadline dépassée</p>
+                )}
+              </div>
 
-            {/* ÉTUDIANT */}
-            {!isProf && (
-              <div className="mt-8 p-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-3xl border-2 border-indigo-300">
-                {hasSubmitted(project) ? (
-                  <div className="text-center space-y-6">
-                    <p className="text-green-700 font-bold text-2xl">Rendu déposé !</p>
+              <div className="p-8 space-y-6">
+                <p className="text-gray-700 text-lg">
+                  {project.description || 'Aucune description'}
+                </p>
 
-                    <div className="bg-white p-6 rounded-2xl shadow-inner border-2 border-green-300">
-                      <p className="text-gray-700 font-medium mb-3">Ton fichier :</p>
-                      <p className="text-lg font-bold text-indigo-800">
-                        {getMySubmission(project)?.customName || 'Mon compte-rendu'}
-                      </p>
-                      <a
-                        href={`http://localhost:5000/${getMySubmission(project)?.file}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block mt-4 px-10 py-4 bg-gradient-to-r from-green-600 to-emerald-700 text-white font-bold text-lg rounded-full shadow-xl hover:shadow-green-400 transition"
-                      >
-                        Voir mon compte-rendu
-                      </a>
-                    </div>
+                {project.pdf && (
+                  <a 
+                    href={`http://localhost:5000/${project.pdf}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block text-indigo-600 font-semibold hover:underline"
+                  >
+                    📄 Télécharger le sujet PDF
+                  </a>
+                )}
 
-                    <div className="flex justify-center gap-6">
-                      <button
+                {/* Étudiant */}
+                {!isProf && (
+                  <div className="pt-6 border-t">
+                    {submission ? (
+                      <div className="bg-green-50 rounded-2xl p-6 text-center border-2 border-green-200">
+                        <p className="font-bold text-green-800 text-lg">✅ Rendu déposé</p>
+                        <p className="text-gray-700 mt-2 font-medium">{submission.customName}</p>
+                        <a 
+                          href={`http://localhost:5000/${submission.file}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block mt-2 text-blue-600 underline text-sm"
+                        >
+                          Télécharger mon rendu
+                        </a>
+                        {!isDeadlinePassed && (
+                          <button 
+                            onClick={() => openStudentModal(project)} 
+                            className="mt-4 text-indigo-600 underline font-semibold"
+                          >
+                            Modifier le rendu
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button 
                         onClick={() => openStudentModal(project)}
-                        className="px-10 py-4 bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition"
+                        disabled={isDeadlinePassed}
+                        className={`w-full py-5 text-white font-bold text-xl rounded-2xl shadow-xl transition ${
+                          isDeadlinePassed 
+                            ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-2xl'
+                        }`}
+                      >
+                        {isDeadlinePassed ? 'Deadline dépassée' : 'Déposer mon rendu'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Professeur */}
+                {isProf && (
+                  <div className="pt-6 border-t space-y-5">
+                    <p className="text-center font-bold text-purple-700 text-xl">
+                      {project.submissions?.length || 0} rendu(s)
+                    </p>
+
+                    {/* Liste des rendus étudiants */}
+                    {project.submissions && project.submissions.length > 0 && (
+                      <div className="bg-purple-50 rounded-2xl p-4 border-2 border-purple-200">
+                        <h4 className="font-bold text-purple-800 text-lg mb-3">📥 Rendus des étudiants :</h4>
+                        <div className="space-y-3 max-h-40 overflow-y-auto">
+                          {project.submissions.map((sub, index) => (
+                            <div key={index} className="flex justify-between items-center bg-white p-3 rounded-lg border">
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-800 text-sm">
+                                  {sub.customName}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Par: {sub.student?.name || 'Étudiant'} • 
+                                  Le: {new Date(sub.submittedAt).toLocaleDateString('fr-FR')}
+                                </p>
+                              </div>
+                              <a 
+                                href={`http://localhost:5000/${sub.file}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition ml-2"
+                              >
+                                Télécharger
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => openProfModal(project)}
+                        className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105"
                       >
                         Modifier
                       </button>
+
                       <button
-                        onClick={() => handleDeleteSubmission(project._id)}
-                        className="px-10 py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition"
+                        onClick={() => deleteProject(project._id)}
+                        className="flex-1 py-4 bg-gradient-to-r from-gray-700 to-purple-800 text-white font-semibold rounded-xl shadow-lg hover:from-gray-800 hover:to-purple-900 transition transform hover:scale-105"
                       >
                         Supprimer
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center">
-                    <button
-                      onClick={() => openStudentModal(project)}
-                      className="inline-block px-8 py-6 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold text-l rounded-full shadow-2xl hover:shadow-purple-600 transition transform hover:scale-110"
-                    >
-                      Déposer mon travail
-                    </button>
-                  </div>
                 )}
               </div>
-            )}
-
-            {/* PROF */}
-            {isProf && (
-              <div className="mt-10 text-center">
-                <p className="text-purple-700 font-bold text-xl mb-6">
-                  {project.submissions?.length || 0} rendu(s) reçu(s)
-                </p>
-                <div className="flex justify-center gap-8">
-                  <button onClick={() => openProfModal(project)} className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-bold text-lg rounded-full shadow-lg hover:shadow-xl transition">
-                    Modifier
-                  </button>
-                  <button onClick={() => handleDelete(project._id)} className="px-8 py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-lg rounded-full shadow-lg hover:shadow-xl transition">
-                    Supprimer
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Modal Prof */}
-      <Modal isOpen={profModalOpen} onRequestClose={closeProfModal} className="bg-white p-10 rounded-3xl shadow-3xl max-w-lg mx-auto outline-none" overlayClassName="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-        <ProjectForm currentProject={currentProject} closeModal={closeProfModal} refreshProjects={refreshProjects} />
-      </Modal>
+      {/* Message si aucun projet */}
+      {projects.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-gray-600 text-xl">Aucun projet disponible pour le moment</p>
+          {isProf && (
+            <p className="text-gray-500 mt-2">Créez votre premier projet en cliquant sur le bouton ci-dessus</p>
+          )}
+        </div>
+      )}
 
-      {/* Modal Étudiant */}
-      <Modal isOpen={studentModalOpen} onRequestClose={closeStudentModal} className="bg-white p-10 rounded-3xl shadow-3xl max-w-lg mx-auto outline-none" overlayClassName="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-        <div>
-          <h2 className="text-3xl font-bold text-indigo-900 text-center mb-8">
-            {hasSubmitted(selectedProject) ? 'Modifier votre rendu' : 'Déposer votre compte-rendu'}
-          </h2>
-          <input
-            type="text"
-            placeholder="Nom de votre rendu (ex: TP1 - NOM Prénom.pdf)"
-            value={fileName}
-            onChange={(e) => setFileName(e.target.value)}
-            className="w-full px-6 py-4 border-2 border-indigo-300 rounded-xl text-lg mb-6 focus:outline-none focus:border-indigo-600"
-          />
-          <input
-            type="file"
-            accept=".pdf,.zip,.docx"
-            onChange={(e) => setSelectedFile(e.target.files[0])}
-            className="block w-full text-lg text-gray-900 border border-gray-300 rounded-xl cursor-pointer bg-gray-50 p-4 mb-8"
-          />
-          <div className="flex justify-center gap-6">
-            <button onClick={handleSubmitFile} className="px-12 py-5 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold text-xl rounded-full shadow-2xl transition transform hover:scale-105">
-              {hasSubmitted(selectedProject) ? 'Mettre à jour' : 'Déposer'}
+      {/* MODAL ÉTUDIANT */}
+      <Modal
+        isOpen={studentModal}
+        onRequestClose={() => {
+          setStudentModal(false);
+          setSelectedProject(null);
+        }}
+        className="bg-white p-12 rounded-3xl shadow-3xl max-w-lg mx-auto outline-none"
+        overlayClassName="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+      >
+        <div className="space-y-8">
+          <h2 className="text-4xl font-bold text-center text-indigo-800">Déposer mon rendu</h2>
+          
+          {selectedProject && (
+            <div className="bg-indigo-50 p-4 rounded-xl border-2 border-indigo-200">
+              <p className="font-semibold text-indigo-800">Projet: {selectedProject.name}</p>
+              <p className="text-sm text-indigo-600">
+                Deadline: {new Date(selectedProject.deadline).toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+          )}
+          
+          <div>
+            <label className="block text-lg font-medium text-gray-700 mb-2">
+              Nom du fichier :
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: TP1 - Votre Nom.pdf"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl text-lg focus:border-indigo-600 outline-none"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-lg font-medium text-gray-700 mb-2">
+              Fichier :
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.docx,.zip,.jpg,.jpeg,.png"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="w-full px-6 py-4 border-2 border-gray-300 rounded-xl text-lg"
+            />
+            {file && (
+              <p className="text-sm text-green-600 mt-2">
+                ✓ Fichier sélectionné: {file.name}
+              </p>
+            )}
+          </div>
+          
+          <div className="flex gap-6">
+            <button
+              onClick={submitStudentFile}
+              className="flex-1 py-5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold text-xl rounded-xl shadow-xl hover:shadow-2xl transition transform hover:scale-105"
+            >
+              {selectedProject && mySubmission(selectedProject) ? 'Mettre à jour' : 'Déposer'}
             </button>
-            <button onClick={closeStudentModal} className="px-12 py-5 bg-gray-500 hover:bg-gray-600 text-white font-bold text-xl rounded-full">
+            <button
+              onClick={() => {
+                setStudentModal(false);
+                setSelectedProject(null);
+              }}
+              className="flex-1 py-5 bg-gray-600 text-white font-bold text-xl rounded-xl hover:bg-gray-700 transition"
+            >
               Annuler
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* MODAL PROF */}
+      <Modal
+        isOpen={profModal}
+        onRequestClose={() => {
+          setProfModal(false);
+          setEditProject(null);
+        }}
+        className="bg-white p-8 rounded-3xl shadow-3xl max-w-lg mx-auto outline-none"
+        overlayClassName="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+        closeTimeoutMS={200}
+      >
+        <ProjectForm
+          currentProject={editProject}
+          closeModal={() => {
+            setProfModal(false);
+            setEditProject(null);
+          }}
+          refreshProjects={refreshProjects}
+        />
       </Modal>
     </div>
   );
