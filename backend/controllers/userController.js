@@ -1,4 +1,4 @@
-// backend/controllers/userController.js
+// backend/controllers/userController.js → PAS DE CHANGEMENT MAJEUR, MAIS ASSURE ROLE
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
@@ -10,7 +10,7 @@ const registerUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Si le rôle n’est pas fourni → étudiant par défaut
+    // Role strict : seulement etudiant ou admin, default etudiant
     const userRole = role === 'admin' ? 'admin' : 'etudiant';
 
     const userExists = await User.findOne({ email });

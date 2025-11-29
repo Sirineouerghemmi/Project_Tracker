@@ -1,4 +1,4 @@
-// backend/server.js → VERSION FINALE 100% FONCTIONNELLE
+// backend/server.js → SUPPRESSION DES TASKS
 require('colors');
 require('dotenv').config();
 
@@ -6,14 +6,14 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const fs = require('fs');           // AJOUTÉ
-const path = require('path');       // AJOUTÉ
+const fs = require('fs');
+const path = require('path');
 
 const connectDB = require('./config/db');
 
 connectDB();
 
-// CRÉATION AUTOMATIQUE DU DOSSIER UPLOADS (LE BUG ÉTAIT ICI !!!)
+// CRÉATION AUTOMATIQUE DU DOSSIER UPLOADS
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
@@ -37,12 +37,11 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static('uploads')); // Crucial pour voir les fichiers
 
-// Routes
+// Routes → SUPPRESSION DES TASKS
 app.use('/api/users', require('./routes/users'));
 app.use('/api/projects', require('./routes/projects'));
-app.use('/api/tasks', require('./routes/tasks'));
 
-// Socket.io
+// Socket.io (gardé mais non utilisé pour l'instant)
 io.on('connection', (socket) => {
   console.log('Un utilisateur connecté via Socket.io'.green);
   socket.on('disconnect', () => {
